@@ -91,6 +91,13 @@ describe("bootstrap page", () => {
     expect(res.headers.get("referrer-policy")).toBe("no-referrer");
     expect(await res.text()).not.toContain("the secret page");
   });
+
+  it("answers HEAD requests for the page", async () => {
+    const { id } = await share();
+    const res = await call(`/r/${id}`, { method: "HEAD" });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+  });
 });
 
 describe("opening a capability", () => {

@@ -20,8 +20,8 @@ export async function handle(request, env, deps) {
   if (request.method === "POST" && (m = path.match(/^\/admin\/resources\/([^/]+)\/invites$/))) {
     return createInvite(request, env, m[1], url.origin);
   }
-  if (request.method === "GET" && (m = path.match(/^\/r\/[^/]+$/))) {
-    return new Response(BOOTSTRAP_PAGE, {
+  if ((request.method === "GET" || request.method === "HEAD") && /^\/r\/[^/]+$/.test(path)) {
+    return new Response(request.method === "HEAD" ? null : BOOTSTRAP_PAGE, {
       headers: {
         "content-type": "text/html; charset=utf-8",
         "referrer-policy": "no-referrer",
