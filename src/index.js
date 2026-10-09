@@ -1,7 +1,9 @@
+import { handle } from "./app.js";
+
 export { Resource } from "./resource.js";
 
 export default {
-  async fetch() {
-    return new Response("Not found", { status: 404 });
+  fetch(request, env) {
+    return handle(request, env, { fetch: (...args) => fetch(...args) });
   },
 };
