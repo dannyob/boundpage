@@ -14,7 +14,7 @@ function fakeGitHub(user = ALICE) {
     const req = new Request(input, init);
     switch (req.url) {
       case "https://github.com/login/oauth/access_token": {
-        const body = new URLSearchParams(await req.text());
+        const body = await req.formData();
         if (body.get("code") !== "good-code" || body.get("client_secret") !== "test-client-secret") {
           return Response.json({ error: "bad_verification_code" });
         }
