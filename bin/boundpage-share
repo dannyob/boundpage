@@ -1,0 +1,62 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""Share an HTML or Markdown file through boundpage and print the capability URL.
+
+  boundpage-share page.md                  # TOFU: first person to sign in gets it
+  boundpage-share page.html --for a@b.org  # only this verified email can claim it
+  boundpage-share --resource ID [--for E]  # another invite to an already-shared page
+
+Set BOUNDPAGE_URL (default http://localhost:8787) and BOUNDPAGE_ADMIN_TOKEN.
+"""
+
+import argparse
+import json
+import os
+import sys
+import urllib.request
+from pathlib import Path
+
+
+def post(base, token, path, payload):
+    req = urllib.request.Request(
+        base.rstrip("/") + path,
+        data=json.dumps(payload).encode(),
+        headers={"authorization": f"Bearer {token}", "content-type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req) as res:
+        return json.load(res)
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("file", nargs="?", type=Path)
+    p.add_argument("--for", dest="email", help="only this verified email may claim the link")
+    p.add_argument("--title")
+    p.add_argument("--resource", help="add an invite to an existing resource id instead of uploading")
+    args = p.parse_args()
+
+    base = os.environ.get("BOUNDPAGE_URL", "http://localhost:8787")
+    token = os.environ.get("BOUNDPAGE_ADMIN_TOKEN") or sys.exit("BOUNDPAGE_ADMIN_TOKEN is not set")
+
+    if args.resource:
+        rid = args.resource
+    elif args.file:
+        markdown = args.file.suffix.lower() in (".md", ".markdown")
+        rid = post(base, token, "/admin/resources", {
+            "title": args.title or args.file.stem,
+            "contentType": "text/markdown" if markdown else "text/html",
+            "content": args.file.read_text(),
+        })["id"]
+        print(f"resource: {rid}", file=sys.stderr)
+    else:
+        p.error("give a file to share, or --resource ID")
+
+    print(post(base, token, f"/admin/resources/{rid}/invites", {"expectEmail": args.email})["url"])
+
+
+if __name__ == "__main__":
+    main()

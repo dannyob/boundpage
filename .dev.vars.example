@@ -1,0 +1,4 @@
+ADMIN_TOKEN=change-me
+SESSION_SECRET=change-me-to-a-long-random-string
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
