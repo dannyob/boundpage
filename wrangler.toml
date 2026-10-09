@@ -1,0 +1,11 @@
+name = "boundpage"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[[durable_objects.bindings]]
+name = "RESOURCE"
+class_name = "Resource"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Resource"]

@@ -1,0 +1,27 @@
+{
+  "name": "boundpage",
+  "version": "1.0.0",
+  "description": "Share an HTML or Markdown page via a capability URL that latches to the first (or named) person who signs in",
+  "scripts": {
+    "test": "vitest run",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "marked": "^18.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.0",
+    "vitest": "~4.1",
+    "wrangler": "^4.149.0"
+  },
+  "allowScripts": {
+    "workerd@1.20260815.1": true,
+    "workerd@1.20261006.1": true,
+    "esbuild@0.28.1": true,
+    "esbuild@0.28.2": true
+  },
+  "private": true
+}
