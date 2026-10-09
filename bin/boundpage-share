@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -24,11 +25,19 @@ def post(base, token, path, payload):
     req = urllib.request.Request(
         base.rstrip("/") + path,
         data=json.dumps(payload).encode(),
-        headers={"authorization": f"Bearer {token}", "content-type": "application/json"},
+        # Cloudflare's bot protection rejects urllib's default User-Agent (error 1010)
+        headers={
+            "authorization": f"Bearer {token}",
+            "content-type": "application/json",
+            "user-agent": "boundpage-share",
+        },
         method="POST",
     )
-    with urllib.request.urlopen(req) as res:
-        return json.load(res)
+    try:
+        with urllib.request.urlopen(req) as res:
+            return json.load(res)
+    except urllib.error.HTTPError as e:
+        sys.exit(f"{e.code} from {req.full_url}: {e.read().decode(errors='replace')[:300]}")
 
 
 def main():
