@@ -1,6 +1,10 @@
 name = "boundpage"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
+workers_dev = false
+routes = [
+  { pattern = "boundpage.libertyh.dev", custom_domain = true }
+]
 
 [[durable_objects.bindings]]
 name = "RESOURCE"
