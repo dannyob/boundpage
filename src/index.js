@@ -1,6 +1,7 @@
 import { handle } from "./app.js";
 
 export { Resource } from "./resource.js";
+export { EmailLogin } from "./email-login.js";
 
 export default {
   fetch(request, env) {

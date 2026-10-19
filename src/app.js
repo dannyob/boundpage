@@ -1,6 +1,6 @@
 import { sign, verify } from "./session.js";
 import { provider, configuredProviders } from "./providers.js";
-import { BOOTSTRAP_PAGE } from "./page.js";
+import { BOOTSTRAP_PAGE, CONFIRM_PAGE } from "./page.js";
 
 const SESSION_TTL = 30 * 24 * 3600;
 const OAUTH_TTL = 600;
@@ -21,14 +21,7 @@ export async function handle(request, env, deps) {
     return createInvite(request, env, m[1], url.origin);
   }
   if ((request.method === "GET" || request.method === "HEAD") && /^\/r\/[^/]+$/.test(path)) {
-    return new Response(request.method === "HEAD" ? null : BOOTSTRAP_PAGE, {
-      headers: {
-        "content-type": "text/html; charset=utf-8",
-        "referrer-policy": "no-referrer",
-        "x-frame-options": "DENY",
-        "cache-control": "no-store",
-      },
-    });
+    return page(request, BOOTSTRAP_PAGE);
   }
   if (request.method === "POST" && (m = path.match(/^\/r\/([^/]+)\/open$/))) {
     return openResource(request, env, m[1]);
@@ -38,6 +31,17 @@ export async function handle(request, env, deps) {
   }
   if (request.method === "GET" && (m = path.match(/^\/auth\/([a-z]+)\/callback$/)) && provider(env, m[1])) {
     return finishLogin(request, env, deps, url, m[1]);
+  }
+  if (emailEnabled(env)) {
+    if (request.method === "POST" && path === "/auth/email/start") {
+      return startEmailLogin(request, env, deps, url.origin);
+    }
+    if (request.method === "POST" && path === "/auth/email/verify") {
+      return finishEmailLogin(request, env);
+    }
+    if ((request.method === "GET" || request.method === "HEAD") && path === "/auth/email/confirm") {
+      return page(request, CONFIRM_PAGE);
+    }
   }
   if (request.method === "POST" && path === "/auth/logout") {
     return redirect(safeReturn(url.searchParams.get("return")), [cookie("bp_session", "", { maxAge: 0 })]);
@@ -78,7 +82,7 @@ async function openResource(request, env, id) {
     case "login": {
       const ret = encodeURIComponent(`/r/${id}`);
       const methods = configuredProviders(env).map((p) => ({ ...p, url: `/auth/${p.id}/start?return=${ret}` }));
-      return Response.json({ methods }, { status: 401 });
+      return Response.json({ methods, email: emailEnabled(env) }, { status: 401 });
     }
     case "forbidden":
       return Response.json({ signedInAs: session.login }, { status: 403 });
@@ -108,8 +112,76 @@ async function finishLogin(request, env, deps, url, id) {
 }
 
 async function startSession(env, identity, ret, extraCookies = []) {
-  const session = await sign(identity, env.SESSION_SECRET, SESSION_TTL);
-  return redirect(ret, [cookie("bp_session", session, { maxAge: SESSION_TTL }), ...extraCookies]);
+  return redirect(ret, [await sessionCookie(env, identity), ...extraCookies]);
+}
+
+async function sessionCookie(env, identity) {
+  return cookie("bp_session", await sign(identity, env.SESSION_SECRET, SESSION_TTL), { maxAge: SESSION_TTL });
+}
+
+function emailEnabled(env) {
+  return Boolean(env.MAIL_FROM && env.SMTP_PASS);
+}
+
+function emailLogin(env, address) {
+  return env.EMAIL_LOGIN.get(env.EMAIL_LOGIN.idFromName(address));
+}
+
+// Sending a code needs a live capability, so the site can only be made to
+// mail people who were sent a link.
+async function startEmailLogin(request, env, deps, origin) {
+  const { resource, cap, email } = await request.json().catch(() => ({}));
+  const address = normaliseEmail(email);
+  if (!address) return Response.json({ error: "not an email address" }, { status: 400 });
+  const stub = resourceStub(env, resource);
+  if (!stub || (await stub.open(cap, null)).status !== "login") {
+    return Response.json({ error: "not found" }, { status: 404 });
+  }
+
+  const issued = await emailLogin(env, address).issue();
+  if (!issued.ok) return Response.json({ error: "too many codes; try again later" }, { status: 429 });
+
+  const host = new URL(origin).host;
+  const link = `${origin}/auth/email/confirm#` + new URLSearchParams({ email: address, code: issued.code, return: `/r/${resource}` });
+  await deps.sendMail({
+    to: address,
+    subject: `Your ${host} code is ${issued.code}`,
+    text:
+      `Your sign-in code for ${host} is:\n\n    ${issued.code}\n\n` +
+      `It works for 10 minutes. You can also open this link and press "Sign in":\n\n${link}\n\n` +
+      `If you did not ask for this, you can ignore this email.\n`,
+  });
+  return Response.json({ sent: true });
+}
+
+async function finishEmailLogin(request, env) {
+  const { email, code } = await request.json().catch(() => ({}));
+  const address = normaliseEmail(email);
+  if (!address || !/^\d{6}$/.test(String(code)) || !(await emailLogin(env, address).verify(String(code)))) {
+    return Response.json({ error: "wrong or expired code" }, { status: 401 });
+  }
+  const identity = { sub: `email:${address}`, login: address, emails: [address] };
+  return Response.json({ ok: true }, { headers: { "set-cookie": await sessionCookie(env, identity) } });
+}
+
+// Lower-cased address, or null. No whitespace or header punctuation, so it
+// is safe to put in a mail header.
+function normaliseEmail(email) {
+  if (typeof email !== "string") return null;
+  const address = email.trim().toLowerCase();
+  if (address.length > 254) return null;
+  return /^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:"]+\.[a-z0-9-]{2,}$/.test(address) ? address : null;
+}
+
+function page(request, html) {
+  return new Response(request.method === "HEAD" ? null : html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "referrer-policy": "no-referrer",
+      "x-frame-options": "DENY",
+      "cache-control": "no-store",
+    },
+  });
 }
 
 function resourceStub(env, id) {

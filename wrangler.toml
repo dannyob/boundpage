@@ -6,10 +6,21 @@ routes = [
   { pattern = "share.libertyh.dev", custom_domain = true }
 ]
 
+[vars]
+MAIL_FROM = "share@libertyh.dev"
+
 [[durable_objects.bindings]]
 name = "RESOURCE"
 class_name = "Resource"
 
+[[durable_objects.bindings]]
+name = "EMAIL_LOGIN"
+class_name = "EmailLogin"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Resource"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["EmailLogin"]
