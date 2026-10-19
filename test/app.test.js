@@ -1,74 +1,5 @@
-import { env } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
-import { handle } from "../src/app.js";
-
-const ORIGIN = "https://pages.test";
-const ADMIN = { authorization: "Bearer test-admin-token", "content-type": "application/json" };
-
-const ALICE = { id: 1, login: "alice", emails: [{ email: "alice@example.com", verified: true, primary: true }] };
-const BOB = { id: 2, login: "bob", emails: [{ email: "bob@example.com", verified: true, primary: true }] };
-
-// Stands in for github.com and api.github.com; `user` is who "logs in".
-function fakeGitHub(user = ALICE) {
-  return async (input, init) => {
-    const req = new Request(input, init);
-    switch (req.url) {
-      case "https://github.com/login/oauth/access_token": {
-        const body = await req.formData();
-        if (body.get("code") !== "good-code" || body.get("client_secret") !== "test-client-secret") {
-          return Response.json({ error: "bad_verification_code" });
-        }
-        return Response.json({ access_token: "gh-token" });
-      }
-      case "https://api.github.com/user":
-        return Response.json({ id: user.id, login: user.login });
-      case "https://api.github.com/user/emails":
-        return Response.json(user.emails);
-      default:
-        return new Response("unexpected request " + req.url, { status: 500 });
-    }
-  };
-}
-
-function call(path, init = {}, user = ALICE) {
-  return handle(new Request(ORIGIN + path, { redirect: "manual", ...init }), env, { fetch: fakeGitHub(user) });
-}
-
-function cookieValue(res, name) {
-  for (const c of res.headers.getSetCookie()) {
-    const [pair] = c.split(";");
-    const [k, v] = pair.split("=");
-    if (k === name) return v;
-  }
-  return undefined;
-}
-
-async function share({ content = "<p>the secret page</p>", contentType = "text/html", expectEmail } = {}) {
-  const res = await call("/admin/resources", {
-    method: "POST", headers: ADMIN, body: JSON.stringify({ title: "Shared", contentType, content }),
-  });
-  const { id } = await res.json();
-  const inv = await call(`/admin/resources/${id}/invites`, {
-    method: "POST", headers: ADMIN, body: JSON.stringify({ expectEmail }),
-  });
-  const { url } = await inv.json();
-  return { id, url, cap: new URL(url).hash.replace("#cap=", "") };
-}
-
-async function login(user, returnTo = "/") {
-  const start = await call(`/auth/github/start?return=${encodeURIComponent(returnTo)}`, {}, user);
-  const state = new URL(start.headers.get("location")).searchParams.get("state");
-  const cb = await call(`/auth/github/callback?code=good-code&state=${state}`, {
-    headers: { cookie: `bp_oauth=${cookieValue(start, "bp_oauth")}` },
-  }, user);
-  return cookieValue(cb, "bp_session");
-}
-
-function open(id, cap, session, user) {
-  const headers = { "content-type": "application/json" };
-  if (session) headers.cookie = `bp_session=${session}`;
-  return call(`/r/${id}/open`, { method: "POST", headers, body: JSON.stringify({ cap }) }, user);
-}
+import { ORIGIN, ADMIN, ALICE, BOB, call, cookieValue, share, login, open } from "./helpers.js";
 
 describe("admin API", () => {
   it("refuses requests without the admin token", async () => {
@@ -105,7 +36,8 @@ describe("opening a capability", () => {
     const { id, cap } = await share();
     const res = await open(id, cap);
     expect(res.status).toBe(401);
-    expect((await res.json()).login).toBe(`/auth/github/start?return=${encodeURIComponent(`/r/${id}`)}`);
+    const { methods } = await res.json();
+    expect(methods).toContainEqual({ id: "github", name: "GitHub", url: `/auth/github/start?return=${encodeURIComponent(`/r/${id}`)}` });
   });
 
   it("does not recognise a wrong capability", async () => {
@@ -198,6 +130,10 @@ describe("GitHub login", () => {
     });
     expect(cb.status).toBe(400);
     expect(cookieValue(cb, "bp_session")).toBeUndefined();
+  });
+
+  it("does not know an unconfigured provider", async () => {
+    expect((await call("/auth/myspace/start")).status).toBe(404);
   });
 
   it("clears the session on logout", async () => {

@@ -54,7 +54,14 @@ export const BOOTSTRAP_PAGE = `<!doctype html>
     message.replaceWith(frame);
   } else if (res.status === 401) {
     show('<p>This page was shared with you. Sign in to open it; the link will then work only for your account.</p>' +
-         '<p><a class="button" href="' + body.login + '">Sign in with GitHub</a></p>');
+         '<p id="methods"></p>');
+    for (const m of body.methods) {
+      const a = document.createElement("a");
+      a.className = "button";
+      a.href = m.url;
+      a.textContent = "Sign in with " + m.name;
+      document.getElementById("methods").append(a, " ");
+    }
   } else if (res.status === 403) {
     show("<p>This link belongs to a different account. You are signed in as <b></b>.</p>" +
          '<form method="post" action="/auth/logout?return=' + encodeURIComponent(location.pathname) + '">' +

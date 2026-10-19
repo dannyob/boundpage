@@ -1,5 +1,5 @@
 import { sign, verify } from "./session.js";
-import { authorizeUrl, identityFromCode } from "./github.js";
+import { provider, configuredProviders } from "./providers.js";
 import { BOOTSTRAP_PAGE } from "./page.js";
 
 const SESSION_TTL = 30 * 24 * 3600;
@@ -33,11 +33,11 @@ export async function handle(request, env, deps) {
   if (request.method === "POST" && (m = path.match(/^\/r\/([^/]+)\/open$/))) {
     return openResource(request, env, m[1]);
   }
-  if (request.method === "GET" && path === "/auth/github/start") {
-    return startLogin(env, url);
+  if (request.method === "GET" && (m = path.match(/^\/auth\/([a-z]+)\/start$/)) && provider(env, m[1])) {
+    return startLogin(env, url, m[1]);
   }
-  if (request.method === "GET" && path === "/auth/github/callback") {
-    return finishLogin(request, env, deps, url);
+  if (request.method === "GET" && (m = path.match(/^\/auth\/([a-z]+)\/callback$/)) && provider(env, m[1])) {
+    return finishLogin(request, env, deps, url, m[1]);
   }
   if (request.method === "POST" && path === "/auth/logout") {
     return redirect(safeReturn(url.searchParams.get("return")), [cookie("bp_session", "", { maxAge: 0 })]);
@@ -75,8 +75,11 @@ async function openResource(request, env, id) {
   switch (result.status) {
     case "ok":
       return Response.json({ title: result.title, html: result.html });
-    case "login":
-      return Response.json({ login: `/auth/github/start?return=${encodeURIComponent(`/r/${id}`)}` }, { status: 401 });
+    case "login": {
+      const ret = encodeURIComponent(`/r/${id}`);
+      const methods = configuredProviders(env).map((p) => ({ ...p, url: `/auth/${p.id}/start?return=${ret}` }));
+      return Response.json({ methods }, { status: 401 });
+    }
     case "forbidden":
       return Response.json({ signedInAs: session.login }, { status: 403 });
     default:
@@ -84,28 +87,29 @@ async function openResource(request, env, id) {
   }
 }
 
-async function startLogin(env, url) {
+async function startLogin(env, url, id) {
   const nonce = crypto.randomUUID();
   const ret = safeReturn(url.searchParams.get("return"));
   const state = await sign({ nonce, ret }, env.SESSION_SECRET, OAUTH_TTL);
-  return redirect(authorizeUrl(env, `${url.origin}/auth/github/callback`, nonce), [
-    cookie("bp_oauth", state, { maxAge: OAUTH_TTL, path: "/auth/github" }),
+  return redirect(provider(env, id).authorizeUrl(env, `${url.origin}/auth/${id}/callback`, nonce), [
+    cookie("bp_oauth", state, { maxAge: OAUTH_TTL, path: `/auth/${id}` }),
   ]);
 }
 
-async function finishLogin(request, env, deps, url) {
+async function finishLogin(request, env, deps, url, id) {
   const pending = await verify(readCookie(request, "bp_oauth"), env.SESSION_SECRET);
   if (!pending || pending.nonce !== url.searchParams.get("state")) {
     return new Response("Login expired or did not match. Try again.", { status: 400 });
   }
-  const identity = await identityFromCode(env, deps.fetch, url.searchParams.get("code"), `${url.origin}/auth/github/callback`);
-  if (!identity) return new Response("GitHub did not accept the login.", { status: 400 });
+  const p = provider(env, id);
+  const identity = await p.identityFromCode(env, deps.fetch, url.searchParams.get("code"), `${url.origin}/auth/${id}/callback`);
+  if (!identity) return new Response(`${p.name} did not accept the login.`, { status: 400 });
+  return startSession(env, identity, pending.ret, [cookie("bp_oauth", "", { maxAge: 0, path: `/auth/${id}` })]);
+}
 
+async function startSession(env, identity, ret, extraCookies = []) {
   const session = await sign(identity, env.SESSION_SECRET, SESSION_TTL);
-  return redirect(pending.ret, [
-    cookie("bp_session", session, { maxAge: SESSION_TTL }),
-    cookie("bp_oauth", "", { maxAge: 0, path: "/auth/github" }),
-  ]);
+  return redirect(ret, [cookie("bp_session", session, { maxAge: SESSION_TTL }), ...extraCookies]);
 }
 
 function resourceStub(env, id) {
