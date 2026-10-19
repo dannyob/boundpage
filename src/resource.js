@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { marked } from "marked";
-import { b64url } from "./session.js";
+import { b64url, sha256 } from "./util.js";
 
 // One Resource per shared page. It holds the page content and a table of
 // invites; each invite is a capability that latches to the first account
@@ -71,9 +71,4 @@ export class Resource extends DurableObject {
 
 function randomToken() {
   return b64url(crypto.getRandomValues(new Uint8Array(32)));
-}
-
-async function sha256(text) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }

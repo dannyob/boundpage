@@ -1,3 +1,5 @@
+import { b64url } from "./util.js";
+
 // Compact HMAC-signed tokens: base64url(json) "." base64url(hmac).
 // Used for the session cookie and the OAuth state cookie.
 
@@ -23,10 +25,6 @@ export async function verify(token, secret) {
 
 function hmacKey(secret) {
   return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
-}
-
-export function b64url(bytes) {
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function unb64url(text) {
