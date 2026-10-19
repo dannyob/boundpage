@@ -11,6 +11,8 @@ export default defineConfig({
           SESSION_SECRET: "test-session-secret",
           GITHUB_CLIENT_ID: "test-client-id",
           GITHUB_CLIENT_SECRET: "test-client-secret",
+          GOOGLE_CLIENT_ID: "test-google-id",
+          GOOGLE_CLIENT_SECRET: "test-google-secret",
         },
       },
     }),
