@@ -167,3 +167,38 @@ export const CONFIRM_PAGE = `<!doctype html>
 </body>
 </html>
 `;
+
+export const PRIVACY_PAGE = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy – share.libertyh.dev</title>
+<style>${STYLE} #message { margin-top: 5vh; }</style>
+</head>
+<body>
+<div id="message">
+<h1>Privacy</h1>
+<p>share.libertyh.dev is run by Danny O'Brien to share pages with particular people. Each shared link works only for the
+account that first opens it, or for the person it was made for.</p>
+
+<h2>What is collected</h2>
+<p>When you sign in with GitHub or Google, the site receives your account's ID number, your username or email address,
+and the email addresses that provider has verified. When you sign in by email, it receives the address you type.</p>
+
+<h2>What is stored, and where</h2>
+<ul>
+<li>For each link you open: the account ID or email address that claimed it, and when.</li>
+<li>In your browser: a sign-in cookie that lasts 30 days, and the links you have opened, kept in local storage.</li>
+<li>For email sign-in: a scrambled (hashed) copy of the code for its ten minutes of life, and the times codes were sent
+to your address in the last hour, to stop the site being used to flood a mailbox.</li>
+</ul>
+<p>The site runs on Cloudflare. Sign-in emails are sent through Purelymail. Nothing is passed to anyone else, and there
+is no advertising, analytics or tracking.</p>
+
+<h2>Contact</h2>
+<p>To ask what is held about you, or to have it removed, write to share@libertyh.dev.</p>
+</div>
+</body>
+</html>
+`;

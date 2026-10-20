@@ -1,6 +1,6 @@
 import { sign, verify } from "./session.js";
 import { provider, configuredProviders } from "./providers.js";
-import { BOOTSTRAP_PAGE, CONFIRM_PAGE } from "./page.js";
+import { BOOTSTRAP_PAGE, CONFIRM_PAGE, PRIVACY_PAGE } from "./page.js";
 
 const SESSION_TTL = 30 * 24 * 3600;
 const OAUTH_TTL = 600;
@@ -13,6 +13,9 @@ export async function handle(request, env, deps) {
 
   if (request.method === "GET" && path === "/") {
     return new Response("boundpage\n", { headers: { "content-type": "text/plain" } });
+  }
+  if ((request.method === "GET" || request.method === "HEAD") && path === "/privacy") {
+    return page(request, PRIVACY_PAGE);
   }
   if (request.method === "POST" && path === "/admin/resources") {
     return createResource(request, env);

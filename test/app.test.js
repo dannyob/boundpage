@@ -142,3 +142,14 @@ describe("GitHub login", () => {
     expect(res.headers.getSetCookie().join()).toMatch(/bp_session=;.*Max-Age=0/);
   });
 });
+
+describe("privacy page", () => {
+  it("is served as HTML and names what is stored", async () => {
+    const res = await call("/privacy");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const text = await res.text();
+    expect(text).toContain("Privacy");
+    expect(text).toContain("share@libertyh.dev");
+  });
+});
