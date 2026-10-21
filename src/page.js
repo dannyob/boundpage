@@ -168,18 +168,18 @@ export const CONFIRM_PAGE = `<!doctype html>
 </html>
 `;
 
-export const PRIVACY_PAGE = `<!doctype html>
+export const privacyPage = (host) => `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Privacy – share.libertyh.dev</title>
+<title>Privacy – ${host}</title>
 <style>${STYLE} #message { margin-top: 5vh; }</style>
 </head>
 <body>
 <div id="message">
 <h1>Privacy</h1>
-<p>share.libertyh.dev is run by Liberty Hall to share pages with particular people. Each shared link works only for the
+<p>${host} is run by Liberty Hall to share pages with particular people. Each shared link works only for the
 account that first opens it, or for the person it was made for.</p>
 
 <h2>What is collected</h2>

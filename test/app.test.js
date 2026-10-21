@@ -201,6 +201,12 @@ describe("privacy page", () => {
     expect(text).toContain("share@libertyh.dev");
   });
 
+  it("names the host it is served from", async () => {
+    const text = await (await call("/privacy")).text();
+    expect(text).toContain("pages.test is run by");
+    expect(text).not.toContain("libertyh.dev is run by");
+  });
+
   it("names Liberty Hall as the operator and links the services it uses", async () => {
     const text = await (await call("/privacy")).text();
     expect(text).toContain("Liberty Hall");
