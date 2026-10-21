@@ -1,0 +1,36 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""Write a celld deploy config with secrets filled in from the environment.
+
+celld has no secret store: a node only sees the `vars` of the deployed
+config. So the config that goes to the bucket is generated at deploy time
+from wrangler.celld.jsonc plus whichever of these are set in the
+environment, and never committed:
+
+  ADMIN_TOKEN SESSION_SECRET GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET
+  GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET SMTP_PASS MAIL_FROM
+
+  bin/celld-config wrangler.celld.jsonc > wrangler.celld.generated.json
+"""
+
+import json
+import os
+import re
+import sys
+
+SECRETS = ["ADMIN_TOKEN", "SESSION_SECRET", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET",
+           "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "SMTP_PASS", "MAIL_FROM"]
+
+src = sys.argv[1] if len(sys.argv) > 1 else "wrangler.celld.jsonc"
+text = re.sub(r"^\s*//.*$", "", open(src).read(), flags=re.M)   # strip // comments
+cfg = json.loads(text)
+cfg.setdefault("vars", {})
+given = [k for k in SECRETS if os.environ.get(k)]
+cfg["vars"].update({k: os.environ[k] for k in given})
+if "ADMIN_TOKEN" not in cfg["vars"] or "SESSION_SECRET" not in cfg["vars"]:
+    sys.exit("ADMIN_TOKEN and SESSION_SECRET must be set")
+print(f"vars: {', '.join(sorted(cfg['vars']))}", file=sys.stderr)
+json.dump(cfg, sys.stdout, indent=2)

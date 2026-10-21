@@ -2,3 +2,5 @@ node_modules/
 .wrangler/
 .dev.vars
 .celld/
+celld-secrets.sh
+wrangler.celld.generated.json
