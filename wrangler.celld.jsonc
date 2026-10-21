@@ -1,0 +1,18 @@
+// Config for running on celld (https://github.com/denoland/celld), which
+// takes JSON only and rejects `routes`. Everything else matches wrangler.toml.
+{
+  "name": "boundpage",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "vars": { "MAIL_FROM": "share@libertyh.dev" },
+  "durable_objects": {
+    "bindings": [
+      { "name": "RESOURCE", "class_name": "Resource" },
+      { "name": "EMAIL_LOGIN", "class_name": "EmailLogin" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Resource"] },
+    { "tag": "v2", "new_sqlite_classes": ["EmailLogin"] }
+  ]
+}

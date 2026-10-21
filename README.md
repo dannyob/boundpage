@@ -102,8 +102,21 @@ press, so link-scanning mail filters can't spend it.
 Nothing here depends on KV, R2, Queues, or Cloudflare Access. The only
 Cloudflare-specific API is `connect()` from `cloudflare:sockets`, used for
 SMTP, and it is passed in from `src/index.js` so the mailer can be swapped
-for an HTTP mail API. Whether this actually runs on celld is still to be
-tried.
+for an HTTP mail API.
+
+It runs unchanged on [celld](https://github.com/denoland/celld) 0.6.3,
+Deno's self-hosted implementation of Workers and Durable Objects:
+
+```sh
+curl -fsSL https://celld.dev/install.sh | sh     # installs to ~/.local/bin
+PATH=$PWD/node_modules/.bin:$PATH celld dev wrangler.celld.jsonc --port 8787
+```
+
+Tried on 2026-10-21: the Durable Objects with SQLite storage and RPC, the
+whole admin API and CLI, GitHub sign-in end to end, and the SMTP socket to
+Purelymail all worked. celld only reads JSON config and refuses a `routes`
+key, hence the second config file. Running a fleet rather than `celld dev`
+needs an S3, GCS or Azure bucket and has not been tried.
 
 ## Not done
 
