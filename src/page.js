@@ -179,7 +179,7 @@ export const PRIVACY_PAGE = `<!doctype html>
 <body>
 <div id="message">
 <h1>Privacy</h1>
-<p>share.libertyh.dev is run by Danny O'Brien to share pages with particular people. Each shared link works only for the
+<p>share.libertyh.dev is run by Liberty Hall to share pages with particular people. Each shared link works only for the
 account that first opens it, or for the person it was made for.</p>
 
 <h2>What is collected</h2>
@@ -193,11 +193,13 @@ and the email addresses that provider has verified. When you sign in by email, i
 <li>For email sign-in: a scrambled (hashed) copy of the code for its ten minutes of life, and the times codes were sent
 to your address in the last hour, to stop the site being used to flood a mailbox.</li>
 </ul>
-<p>The site runs on Cloudflare. Sign-in emails are sent through Purelymail. Nothing is passed to anyone else, and there
+<p>The site runs on <a href="https://www.cloudflare.com/">Cloudflare</a>. Sign-in emails are sent through
+<a href="https://purelymail.com/">Purelymail</a>. Nothing is passed to anyone else, and there
 is no advertising, analytics or tracking.</p>
 
 <h2>Contact</h2>
-<p>To ask what is held about you, or to have it removed, write to share@libertyh.dev.</p>
+<p>To ask what is held about you, or to have it removed, write to
+<a href="mailto:share@libertyh.dev">share@libertyh.dev</a>.</p>
 </div>
 </body>
 </html>

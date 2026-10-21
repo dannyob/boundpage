@@ -152,4 +152,13 @@ describe("privacy page", () => {
     expect(text).toContain("Privacy");
     expect(text).toContain("share@libertyh.dev");
   });
+
+  it("names Liberty Hall as the operator and links the services it uses", async () => {
+    const text = await (await call("/privacy")).text();
+    expect(text).toContain("Liberty Hall");
+    expect(text).not.toContain("Danny O'Brien");
+    expect(text).toContain('href="mailto:share@libertyh.dev"');
+    expect(text).toContain('href="https://www.cloudflare.com/');
+    expect(text).toContain('href="https://purelymail.com/');
+  });
 });
