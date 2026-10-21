@@ -1,0 +1,114 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""Manage pages shared through boundpage.
+
+  boundpage share page.md                 # upload and print a link; first to sign in gets it
+  boundpage share page.html --for a@b.org # only this verified email can claim the link
+  boundpage invite ID [--for a@b.org]     # another link to an already-shared page
+  boundpage invites ID                    # list a page's links and who claimed them
+  boundpage revoke ID INVITE              # stop a link working (INVITE from `invites`)
+  boundpage update ID page.md             # replace a page's content; links keep working
+
+Set BOUNDPAGE_URL (default http://localhost:8787) and BOUNDPAGE_ADMIN_TOKEN.
+"""
+
+import argparse
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+class Client:
+    def __init__(self, base, token):
+        self.base, self.token = base.rstrip("/"), token
+
+    def call(self, method, path, payload=None):
+        req = urllib.request.Request(
+            self.base + path,
+            data=None if payload is None else json.dumps(payload).encode(),
+            # Cloudflare's bot protection rejects urllib's default User-Agent (error 1010)
+            headers={
+                "authorization": f"Bearer {self.token}",
+                "content-type": "application/json",
+                "user-agent": "boundpage-cli",
+            },
+            method=method,
+        )
+        try:
+            with urllib.request.urlopen(req) as res:
+                return json.load(res)
+        except urllib.error.HTTPError as e:
+            sys.exit(f"{e.code} from {req.full_url}: {e.read().decode(errors='replace')[:300]}")
+
+
+def page_payload(path: Path, title):
+    markdown = path.suffix.lower() in (".md", ".markdown")
+    return {
+        "title": title or path.stem,
+        "contentType": "text/markdown" if markdown else "text/html",
+        "content": path.read_text(),
+    }
+
+
+def when(ms):
+    return "-" if not ms else datetime.fromtimestamp(ms / 1000, timezone.utc).strftime("%Y-%m-%d %H:%M")
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest="command", required=True)
+
+    s = sub.add_parser("share", help="upload a page and print a link to it")
+    s.add_argument("file", type=Path)
+    s.add_argument("--for", dest="email", help="only this verified email may claim the link")
+    s.add_argument("--title")
+
+    s = sub.add_parser("invite", help="mint another link to an existing page")
+    s.add_argument("id")
+    s.add_argument("--for", dest="email")
+
+    s = sub.add_parser("invites", help="list a page's links")
+    s.add_argument("id")
+
+    s = sub.add_parser("revoke", help="stop a link working")
+    s.add_argument("id")
+    s.add_argument("invite", help="invite id from `invites`")
+
+    s = sub.add_parser("update", help="replace a page's content")
+    s.add_argument("id")
+    s.add_argument("file", type=Path)
+    s.add_argument("--title")
+
+    args = p.parse_args()
+    token = os.environ.get("BOUNDPAGE_ADMIN_TOKEN") or sys.exit("BOUNDPAGE_ADMIN_TOKEN is not set")
+    api = Client(os.environ.get("BOUNDPAGE_URL", "http://localhost:8787"), token)
+
+    if args.command == "share":
+        rid = api.call("POST", "/admin/resources", page_payload(args.file, args.title))["id"]
+        print(f"resource: {rid}", file=sys.stderr)
+        print(api.call("POST", f"/admin/resources/{rid}/invites", {"expectEmail": args.email})["url"])
+    elif args.command == "invite":
+        print(api.call("POST", f"/admin/resources/{args.id}/invites", {"expectEmail": args.email})["url"])
+    elif args.command == "invites":
+        rows = api.call("GET", f"/admin/resources/{args.id}/invites")["invites"]
+        print(f"{'INVITE':12}  {'FOR':28}  {'OWNER':28}  {'CLAIMED':16}  REVOKED")
+        for r in rows:
+            print(f"{r['id']:12}  {r['expectEmail'] or '(anyone)':28}  {r['owner'] or '-':28}  "
+                  f"{when(r['claimedAt']):16}  {when(r['revokedAt'])}")
+    elif args.command == "revoke":
+        api.call("DELETE", f"/admin/resources/{args.id}/invites/{args.invite}")
+        print(f"revoked {args.invite}")
+    elif args.command == "update":
+        api.call("PUT", f"/admin/resources/{args.id}", page_payload(args.file, args.title))
+        print(f"updated {args.id}")
+
+
+if __name__ == "__main__":
+    main()
