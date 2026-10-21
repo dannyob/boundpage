@@ -59,6 +59,7 @@ export function call(path, init = {}, user = ALICE) {
   return handle(new Request(ORIGIN + path, { redirect: "manual", ...init }), env, {
     fetch: fakeUpstream(user),
     sendMail: async (msg) => {
+      if (msg.to === "bounce@example.com") throw new Error("SMTP AUTH failed: 535");
       outbox.push(msg);
     },
   });

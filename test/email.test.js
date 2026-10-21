@@ -48,6 +48,15 @@ describe("email code login", () => {
     expect(params.get("return")).toBe(`/r/${id}`);
   });
 
+  it("reports a mail failure without leaking details", async () => {
+    const { id, cap } = await share();
+    const res = await requestCode(id, cap, "bounce@example.com");
+    expect(res.status).toBe(502);
+    const text = await res.text();
+    expect(text).not.toContain("535");
+    expect(text).not.toContain("worker.js");
+  });
+
   it("will not send a code without a valid capability", async () => {
     const { id } = await share();
     const before = outbox.length;

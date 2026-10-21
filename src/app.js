@@ -187,14 +187,19 @@ async function startEmailLogin(request, env, deps, origin) {
 
   const host = new URL(origin).host;
   const link = `${origin}/auth/email/confirm#` + new URLSearchParams({ email: address, code: issued.code, return: `/r/${resource}` });
-  await deps.sendMail({
-    to: address,
-    subject: `Your ${host} code is ${issued.code}`,
-    text:
-      `Your sign-in code for ${host} is:\n\n    ${issued.code}\n\n` +
-      `It works for 10 minutes. You can also open this link and press "Sign in":\n\n${link}\n\n` +
-      `If you did not ask for this, you can ignore this email.\n`,
-  });
+  try {
+    await deps.sendMail({
+      to: address,
+      subject: `Your ${host} code is ${issued.code}`,
+      text:
+        `Your sign-in code for ${host} is:\n\n    ${issued.code}\n\n` +
+        `It works for 10 minutes. You can also open this link and press "Sign in":\n\n${link}\n\n` +
+        `If you did not ask for this, you can ignore this email.\n`,
+    });
+  } catch (err) {
+    console.error("sendMail failed:", err);
+    return Response.json({ error: "could not send the email; try again later" }, { status: 502 });
+  }
   return Response.json({ sent: true });
 }
 
