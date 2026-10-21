@@ -21,9 +21,13 @@ export class Resource extends DurableObject {
         expect_email TEXT,
         owner        TEXT,
         created_at   INTEGER NOT NULL,
-        claimed_at   INTEGER
+        claimed_at   INTEGER,
+        revoked_at   INTEGER
       );
     `);
+    // Resources created before revocation existed lack the column.
+    const cols = this.sql.exec(`PRAGMA table_info(invites)`).toArray().map((c) => c.name);
+    if (!cols.includes("revoked_at")) this.sql.exec(`ALTER TABLE invites ADD COLUMN revoked_at INTEGER`);
   }
 
   async setContent({ title, contentType, content }) {
@@ -47,7 +51,7 @@ export class Resource extends DurableObject {
   async open(secret, identity) {
     const hash = await sha256(String(secret));
     const invite = this.sql.exec(`SELECT * FROM invites WHERE token_hash = ?`, hash).toArray()[0];
-    if (!invite) return { status: "notfound" };
+    if (!invite || invite.revoked_at) return { status: "notfound" };
     if (!identity) return { status: "login" };
 
     if (invite.owner) {
@@ -66,6 +70,28 @@ export class Resource extends DurableObject {
     const page = this.sql.exec(`SELECT * FROM page WHERE id = 1`).toArray()[0];
     const html = page.content_type === "text/markdown" ? marked.parse(page.content) : page.content;
     return { status: "ok", title: page.title, html };
+  }
+
+  // Invites are identified to admins by a prefix of the token hash, which
+  // reveals nothing about the secret.
+  async listInvites() {
+    return this.sql.exec(`SELECT * FROM invites ORDER BY created_at`).toArray().map((r) => ({
+      id: r.token_hash.slice(0, 12),
+      expectEmail: r.expect_email,
+      owner: r.owner,
+      createdAt: r.created_at,
+      claimedAt: r.claimed_at,
+      revokedAt: r.revoked_at,
+    }));
+  }
+
+  async revokeInvite(id) {
+    if (!/^[0-9a-f]{12}$/.test(id)) return false;
+    const cursor = this.sql.exec(
+      `UPDATE invites SET revoked_at = ? WHERE substr(token_hash, 1, 12) = ? AND revoked_at IS NULL`,
+      Date.now(), id,
+    );
+    return cursor.rowsWritten > 0;
   }
 }
 

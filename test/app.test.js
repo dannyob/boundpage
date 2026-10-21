@@ -11,6 +11,26 @@ describe("admin API", () => {
     const { id, url } = await share();
     expect(url).toMatch(new RegExp(`^${ORIGIN}/r/${id}#cap=[A-Za-z0-9_-]{43}$`));
   });
+
+  it("lists and revokes invites", async () => {
+    const { id, cap } = await share();
+    const list = await call(`/admin/resources/${id}/invites`, { headers: ADMIN });
+    expect(list.status).toBe(200);
+    const { invites } = await list.json();
+    expect(invites).toHaveLength(1);
+    expect(invites[0].owner).toBeNull();
+
+    const del = await call(`/admin/resources/${id}/invites/${invites[0].id}`, { method: "DELETE", headers: ADMIN });
+    expect(del.status).toBe(200);
+    expect((await open(id, cap)).status).toBe(404);
+    expect((await call(`/admin/resources/${id}/invites/${invites[0].id}`, { method: "DELETE", headers: ADMIN })).status).toBe(404);
+  });
+
+  it("requires the admin token to list or revoke invites", async () => {
+    const { id } = await share();
+    expect((await call(`/admin/resources/${id}/invites`)).status).toBe(401);
+    expect((await call(`/admin/resources/${id}/invites/abcdef012345`, { method: "DELETE" })).status).toBe(401);
+  });
 });
 
 describe("bootstrap page", () => {

@@ -23,6 +23,12 @@ export async function handle(request, env, deps) {
   if (request.method === "POST" && (m = path.match(/^\/admin\/resources\/([^/]+)\/invites$/))) {
     return createInvite(request, env, m[1], url.origin);
   }
+  if (request.method === "GET" && (m = path.match(/^\/admin\/resources\/([^/]+)\/invites$/))) {
+    return listInvites(request, env, m[1]);
+  }
+  if (request.method === "DELETE" && (m = path.match(/^\/admin\/resources\/([^/]+)\/invites\/([0-9a-f]{12})$/))) {
+    return revokeInvite(request, env, m[1], m[2]);
+  }
   if ((request.method === "GET" || request.method === "HEAD") && /^\/r\/[^/]+$/.test(path)) {
     return page(request, BOOTSTRAP_PAGE);
   }
@@ -70,6 +76,20 @@ async function createInvite(request, env, id, origin) {
   const { expectEmail } = await request.json().catch(() => ({}));
   const cap = await stub.mintInvite({ expectEmail });
   return Response.json({ url: `${origin}/r/${id}#cap=${cap}` }, { status: 201 });
+}
+
+async function listInvites(request, env, id) {
+  if (!(await isAdmin(request, env))) return unauthorized();
+  const stub = resourceStub(env, id);
+  if (!stub) return new Response("Not found", { status: 404 });
+  return Response.json({ invites: await stub.listInvites() });
+}
+
+async function revokeInvite(request, env, id, inviteId) {
+  if (!(await isAdmin(request, env))) return unauthorized();
+  const stub = resourceStub(env, id);
+  if (!stub || !(await stub.revokeInvite(inviteId))) return Response.json({ error: "not found" }, { status: 404 });
+  return Response.json({ revoked: inviteId });
 }
 
 async function openResource(request, env, id) {

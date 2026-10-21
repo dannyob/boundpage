@@ -75,3 +75,43 @@ describe("Resource durable object", () => {
     expect(html).toContain("<em>text</em>");
   });
 });
+
+describe("invite management", () => {
+  it("lists invites with their state but not their secrets", async () => {
+    const stub = await newResource();
+    const cap = await stub.mintInvite({ expectEmail: "alice@example.com" });
+    await stub.open(cap, alice);
+    const [inv] = await stub.listInvites();
+    expect(inv.id).toMatch(/^[0-9a-f]{12}$/);
+    expect(inv.expectEmail).toBe("alice@example.com");
+    expect(inv.owner).toBe("github:1");
+    expect(inv.claimedAt).toBeGreaterThan(0);
+    expect(inv.revokedAt).toBeNull();
+    expect(JSON.stringify(inv)).not.toContain(cap);
+  });
+
+  it("stops a revoked invite opening, even for its owner", async () => {
+    const stub = await newResource();
+    const cap = await stub.mintInvite({});
+    await stub.open(cap, alice);
+    const [{ id }] = await stub.listInvites();
+    expect(await stub.revokeInvite(id)).toBe(true);
+    expect(await stub.open(cap, alice)).toEqual({ status: "notfound" });
+    expect((await stub.listInvites())[0].revokedAt).toBeGreaterThan(0);
+  });
+
+  it("reports an unknown invite id on revoke", async () => {
+    const stub = await newResource();
+    expect(await stub.revokeInvite("000000000000")).toBe(false);
+  });
+
+  it("keeps other invites working after one is revoked", async () => {
+    const stub = await newResource();
+    const capA = await stub.mintInvite({});
+    const capB = await stub.mintInvite({});
+    const invites = await stub.listInvites();
+    await stub.revokeInvite(invites[0].id);
+    const results = [await stub.open(capA, alice), await stub.open(capB, bob)];
+    expect(results.map((r) => r.status).sort()).toEqual(["notfound", "ok"]);
+  });
+});
