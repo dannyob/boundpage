@@ -115,8 +115,16 @@ PATH=$PWD/node_modules/.bin:$PATH celld dev wrangler.celld.jsonc --port 8787
 Tried on 2026-10-21: the Durable Objects with SQLite storage and RPC, the
 whole admin API and CLI, GitHub sign-in end to end, and the SMTP socket to
 Purelymail all worked. celld only reads JSON config and refuses a `routes`
-key, hence the second config file. Running a fleet rather than `celld dev`
-needs an S3, GCS or Azure bucket and has not been tried.
+key, hence the second config file.
+
+A real node (`celld --bucket …`) needs an object-storage bucket that honours
+conditional writes; celld's `diagnose` command checks this, and names the
+providers that fail it. One instance of this app runs that way on a home
+server behind Caddy, with [Fil One](https://docs.fil.one/) as the bucket.
+`make deploy-celld` deploys to it. celld has no secret store, so that
+target generates the config with the secrets filled in from a local,
+uncommitted `celld-secrets.sh` (see `bin/celld-config`), and the secrets
+then sit in the bucket's `deploy/` objects. Keep the bucket private.
 
 ## Not done
 
