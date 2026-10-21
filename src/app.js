@@ -20,6 +20,9 @@ export async function handle(request, env, deps) {
   if (request.method === "POST" && path === "/admin/resources") {
     return createResource(request, env);
   }
+  if (request.method === "PUT" && (m = path.match(/^\/admin\/resources\/([^/]+)$/))) {
+    return updateResource(request, env, m[1]);
+  }
   if (request.method === "POST" && (m = path.match(/^\/admin\/resources\/([^/]+)\/invites$/))) {
     return createInvite(request, env, m[1], url.origin);
   }
@@ -60,13 +63,31 @@ export async function handle(request, env, deps) {
 
 async function createResource(request, env) {
   if (!(await isAdmin(request, env))) return unauthorized();
-  const { title, contentType, content } = await request.json();
-  if (!["text/html", "text/markdown"].includes(contentType) || typeof content !== "string") {
-    return Response.json({ error: "need contentType text/html or text/markdown, and content" }, { status: 400 });
-  }
+  const page = await readPage(request);
+  if (!page) return badPage();
   const id = env.RESOURCE.newUniqueId();
-  await env.RESOURCE.get(id).setContent({ title: title || "Shared page", contentType, content });
+  await env.RESOURCE.get(id).setContent(page);
   return Response.json({ id: id.toString() }, { status: 201 });
+}
+
+async function updateResource(request, env, id) {
+  if (!(await isAdmin(request, env))) return unauthorized();
+  const stub = resourceStub(env, id);
+  if (!stub) return new Response("Not found", { status: 404 });
+  const page = await readPage(request);
+  if (!page) return badPage();
+  await stub.setContent(page);
+  return Response.json({ id });
+}
+
+async function readPage(request) {
+  const { title, contentType, content } = await request.json().catch(() => ({}));
+  if (!["text/html", "text/markdown"].includes(contentType) || typeof content !== "string") return null;
+  return { title: title || "Shared page", contentType, content };
+}
+
+function badPage() {
+  return Response.json({ error: "need contentType text/html or text/markdown, and content" }, { status: 400 });
 }
 
 async function createInvite(request, env, id, origin) {

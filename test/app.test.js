@@ -26,6 +26,34 @@ describe("admin API", () => {
     expect((await call(`/admin/resources/${id}/invites/${invites[0].id}`, { method: "DELETE", headers: ADMIN })).status).toBe(404);
   });
 
+  it("replaces a page's content, keeping its invites", async () => {
+    const { id, cap } = await share();
+    const session = await login(ALICE);
+    expect((await (await open(id, cap, session)).json()).html).toBe("<p>the secret page</p>");
+
+    const res = await call(`/admin/resources/${id}`, {
+      method: "PUT", headers: ADMIN,
+      body: JSON.stringify({ title: "Second draft", contentType: "text/markdown", content: "# Updated" }),
+    });
+    expect(res.status).toBe(200);
+    const after = await (await open(id, cap, session)).json();
+    expect(after.title).toBe("Second draft");
+    expect(after.html).toContain("<h1>Updated</h1>");
+  });
+
+  it("rejects an update with an unknown content type", async () => {
+    const { id } = await share();
+    const res = await call(`/admin/resources/${id}`, {
+      method: "PUT", headers: ADMIN, body: JSON.stringify({ contentType: "text/plain", content: "x" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("requires the admin token to update a page", async () => {
+    const { id } = await share();
+    expect((await call(`/admin/resources/${id}`, { method: "PUT", body: "{}" })).status).toBe(401);
+  });
+
   it("requires the admin token to list or revoke invites", async () => {
     const { id } = await share();
     expect((await call(`/admin/resources/${id}/invites`)).status).toBe(401);
